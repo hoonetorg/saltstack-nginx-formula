@@ -23,6 +23,9 @@ nginx:
   file.directory:
     - user: root
     - group: root
+    - makedirs: True
+    - require:
+      - pkg: nginx
     - require_in:
       - service: nginx
       - file: /etc/nginx/nginx.conf
@@ -39,6 +42,8 @@ nginx:
     - group: root
     - mode: 644
     - template: jinja
+    - require:
+      - pkg: nginx
     - require_in:
       - service: nginx
 
@@ -54,7 +59,7 @@ nginx:
 ssl_key_{{ k }}:
   file:
     - {{ f_fun }}
-    - name: {{ v.path|default(datamap.ssl.dir ~ '/' ~ datamap.ssl.name_prefix|default('') ~ v_name ~ datamap.ssl.name_suffix|default('.key')) }}
+    - name: {{ v.path_ssl_key|default(datamap.ssl.dir ~ '/' ~ datamap.ssl.name_prefix|default('') ~ v_name ~ datamap.ssl.name_suffix_key|default('.key')) }}
     - user: root
     - group: root
     - mode: 600
@@ -70,11 +75,13 @@ ssl_key_{{ k }}:
 ssl_cert_{{ k }}:
   file:
     - {{ f_fun }}
-    - name: {{ v.path|default(datamap.ssl.dir ~ '/' ~ datamap.ssl.name_prefix|default('') ~ v_name ~ datamap.ssl.name_suffix|default('.crt')) }}
+    - name: {{ v.path_ssl_crt|default(datamap.ssl.dir ~ '/' ~ datamap.ssl.name_prefix|default('') ~ v_name ~ datamap.ssl.name_suffix_crt|default('.crt')) }}
     - user: root
     - group: root
     - mode: 600
     - contents_pillar: nginx:vhosts:{{ v_name }}:ssl_cert
+    - require:
+      - pkg: nginx
     - require_in:
       - service: nginx
       - file: /etc/nginx/nginx.conf
@@ -101,10 +108,11 @@ manage_site_{{ k }}:
   cmd:
     - run
     {% if f_fun in ['managed'] %}
-    - name: ln -s {{ datamap.vhosts.path|default('/etc/nginx/sites-available') }}/{{ v_name }} {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v_name }}
+    #- name: ln -s {{ datamap.vhosts.path|default('/etc/nginx/sites-available') }}/{{ v_name }} {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v_name }}
+    - name: ln -s {{ v.path|default(datamap.vhosts.path|default('/etc/nginx/sites-available') ~ '/' ~ datamap.vhosts.name_prefix|default('') ~ v_name ~ datamap.vhosts.name_suffix|default('')) }} {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v.linkname|default(v_name) }}
     - unless: test -L {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v.linkname|default(v_name) }}
     {% else %}
-    - name: rm {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v_name }}
+    - name: rm {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v.linkname|default(v_name) }}
     - onlyif: test -L {{ datamap.vhosts_enabled.path|default('/etc/nginx/sites-enabled') }}/{{ v.linkname|default(v_name) }}
     {% endif %}
     - require:
@@ -112,6 +120,7 @@ manage_site_{{ k }}:
       - file: /etc/nginx/sites-enabled
     - require_in:
       - service: nginx
+      - file: /etc/nginx/nginx.conf
     - watch_in:
       - service: nginx
 {% endfor %}
