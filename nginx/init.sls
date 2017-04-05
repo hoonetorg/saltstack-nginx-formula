@@ -47,6 +47,22 @@ nginx:
     - require_in:
       - service: nginx
 
+{% for k, v in salt['pillar.get']('nginx:htpasswd', {}).items() %}
+/etc/nginx/htpasswd_{{k}}:
+  file.managed:
+    - contents_pillar: nginx:htpasswd:{{k}}
+    - user: root
+    - group: nginx
+    - mode: 640
+    - require:
+      - pkg: nginx
+    - require_in:
+      - service: nginx
+      - file: /etc/nginx/nginx.conf
+    - watch_in:
+      - service: nginx
+{% endfor %}
+
 {% for k, v in salt['pillar.get']('nginx:vhosts', {}).items() %}
   {% if v.ensure|default('managed') in ['managed'] %}
     {% set f_fun = 'managed' %}
@@ -55,6 +71,22 @@ nginx:
   {% endif %}
 
   {% set v_name = v.name|default(k) %}
+
+dhparam_{{ k }}:
+  file:
+    - {{ f_fun }}
+    - name: {{ v.path_dhparam|default(datamap.ssl.dir ~ '/' ~ datamap.ssl.name_prefix|default('') ~ 'dh' ~ v_name ~ datamap.ssl.name_suffix_dh|default('.pem')) }}
+    - user: root
+    - group: root
+    - mode: 600
+    - contents_pillar: nginx:vhosts:{{ v_name }}:dhparam
+    - require:
+      - pkg: nginx
+    - require_in:
+      - service: nginx
+      - file: /etc/nginx/nginx.conf
+    - watch_in:
+      - service: nginx
 
 ssl_key_{{ k }}:
   file:
