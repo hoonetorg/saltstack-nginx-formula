@@ -72,6 +72,7 @@ nginx:
 
   {% set v_name = v.name|default(k) %}
 
+{% if v.ssl|default(False) %}
 dhparam_{{ k }}:
   file:
     - {{ f_fun }}
@@ -119,6 +120,7 @@ ssl_cert_{{ k }}:
       - file: /etc/nginx/nginx.conf
     - watch_in:
       - service: nginx
+{% endif %}
 
 vhost_{{ k }}:
   file:
